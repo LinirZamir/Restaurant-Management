@@ -1,8 +1,8 @@
 import sys
 import pandas as pd
-from PyQt5.QtWidgets import QDialogButtonBox, QInputDialog, QSystemTrayIcon, QDialog, QApplication, QSpinBox, QMenuBar, QMenu, QAction, QMessageBox, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
-from PyQt5.QtGui import QFont, QIcon
-from PyQt5.QtCore import Qt, QEvent, QTimer, QSettings
+from PyQt5.QtWidgets import QDialogButtonBox,  QTabWidget, QSystemTrayIcon, QDialog, QApplication, QSpinBox, QMenuBar, QMenu, QAction, QMessageBox, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt5.QtGui import QFont, QIcon, QIntValidator, QDoubleValidator
+from PyQt5.QtCore import Qt, QTimer, QSettings
 import sqlite3
 import csv
 from datetime import datetime
@@ -16,6 +16,10 @@ class InventoryManagementSystem(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.font = QFont()
+        self.font.setPointSize(12)
+
+
         self.setWindowTitle("Inventory Management System")
         self.setGeometry(100, 100, 700, 400)
         self.tray_icon = QSystemTrayIcon(self)
@@ -27,36 +31,67 @@ class InventoryManagementSystem(QWidget):
         self.check_quantities_timer.timeout.connect(self.check_quantities)
         self.check_quantities_timer.start(6 * 1000)
 
+        # Sorting
+        self.sort_order = Qt.AscendingOrder
 
         # Load settings
         self.load_settings()
 
         self.setup_ui()
-
+        
     def setup_ui(self):
         # Create widgets
-        font = QFont()
-        font.setPointSize(12)
+
+        # Create tab widget
+        self.tabs = QTabWidget()
+        self.tabs.setGeometry(100, 100, 700, 400)
+
+        # Create tabs
+        self.orders_tab = QWidget()
+        self.inventory_tab = QWidget()
+        self.suppliers_tab = QWidget()
+        self.reports_tab = QWidget()
+
+        # Add tabs to the tab widget
+        self.tabs.addTab(self.orders_tab, "Orders")
+        self.tabs.addTab(self.inventory_tab, "Inventory")
+        self.tabs.addTab(self.suppliers_tab, "Suppliers")
+        self.tabs.addTab(self.reports_tab, "Reports")
+
+        # Create navigation bar
         self.nav_bar = QHBoxLayout()
         self.add_item_button = QPushButton("Add Item")
         add_icon = QIcon("icons/add_icon.png")
         self.add_item_button.setIcon(add_icon)
-        self.add_item_button.setFont(font)
+        self.add_item_button.setFont(self.font)
 
         self.edit_item_button = QPushButton("Edit Item")
         edit_icon = QIcon("icons/edit_icon.png")
         self.edit_item_button.setIcon(edit_icon)
-        self.edit_item_button.setFont(font)
+        self.edit_item_button.setFont(self.font)
 
         self.delete_item_button = QPushButton("Delete Item")
         delete_icon = QIcon("icons/delete_icon.png")
         self.delete_item_button.setIcon(delete_icon)
-        self.delete_item_button.setFont(font)
+        self.delete_item_button.setFont(self.font)
 
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Search...")
-        self.search_bar.setFont(font)
+        self.search_bar.setFont(self.font)
 
+        # Add widgets to navigation bar
+        self.nav_bar.addWidget(self.add_item_button)
+        self.nav_bar.addWidget(self.edit_item_button)
+        self.nav_bar.addWidget(self.delete_item_button)
+        self.nav_bar.addStretch()
+        self.nav_bar.addWidget(self.search_bar)
+
+        # Create main layout and add widgets
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.tabs)
+        self.setLayout(main_layout)
+
+        # Set up the inventory tab
         self.item_list = QTableWidget()
         self.item_list.setColumnCount(5)
         self.item_list.setHorizontalHeaderLabels(["Item Name", "Description", "Quantity", "Price", "Modified"])
@@ -64,20 +99,13 @@ class InventoryManagementSystem(QWidget):
 
         self.item_list.setEditTriggers(QTableWidget.NoEditTriggers)
         self.item_list.setSelectionBehavior(QTableWidget.SelectRows)
-        self.item_list.setFont(font)
+        self.item_list.setFont(self.font)
 
-        # Add widgets to layout
-        self.nav_bar.addWidget(self.add_item_button)
-        self.nav_bar.addWidget(self.edit_item_button)
-        self.nav_bar.addWidget(self.delete_item_button)
-        self.nav_bar.addStretch()
-        self.nav_bar.addWidget(self.search_bar)
-        
-        # Create main layout and add widgets
-        main_layout = QVBoxLayout()
-        main_layout.addLayout(self.nav_bar)
-        main_layout.addWidget(self.item_list)
-        self.setLayout(main_layout)
+        # Add the item list to the inventory tab
+        inventory_layout = QVBoxLayout()
+        inventory_layout.addLayout(self.nav_bar)
+        inventory_layout.addWidget(self.item_list)
+        self.inventory_tab.setLayout(inventory_layout)
 
         # Populate item list
         self.populate_item_list()
@@ -117,12 +145,10 @@ class InventoryManagementSystem(QWidget):
         min_qty_action.triggered.connect(self.set_min_qty_threshold)
         settings_menu.addAction(min_qty_action)
 
-
         # Add a stock use action to the settings menu
         sales_report_action = QAction("Stock Used", self)
         sales_report_action.triggered.connect(self.generate_sales_report)
         settings_menu.addAction(sales_report_action)
-
         # Add a help menu to the menu bar
         help_menu = QMenu("Help", self)
         menu_bar.addMenu(help_menu)
@@ -131,7 +157,6 @@ class InventoryManagementSystem(QWidget):
         about_action = QAction("About", self)
         about_action.triggered.connect(self.about)
         help_menu.addAction(about_action)
-
 
         # Add a close action to the file menu
         close_action = QAction("Close", self)
@@ -142,11 +167,19 @@ class InventoryManagementSystem(QWidget):
         self.show_chart_button = QPushButton("Show Chart")
         self.nav_bar.addWidget(self.show_chart_button)
         self.show_chart_button.clicked.connect(self.generate_bar_chart)
-        self.show_chart_button.setFont(font)
+        self.show_chart_button.setFont(self.font)
+
+        self.item_list.horizontalHeader().sectionClicked.connect(self.sort_table)
 
         # Set the menu bar to the main layout
         main_layout.setMenuBar(menu_bar)
 
+    def sort_table(self, column):
+        self.item_list.sortItems(column, self.sort_order)
+        if self.sort_order == Qt.AscendingOrder:
+            self.sort_order = Qt.DescendingOrder
+        else:
+            self.sort_order = Qt.AscendingOrder
 
     def populate_item_list(self):
         # Connect to the database and retrieve the item data
@@ -247,16 +280,31 @@ class InventoryManagementSystem(QWidget):
 
         # Create widgets for the add item window
         name_label = QLabel("Item Name:")
+        name_label.setFont(self.font)
         name_input = QLineEdit()
+        name_input.setFont(self.font)
         desc_label = QLabel("Description:")
+        desc_label.setFont(self.font)
         desc_input = QLineEdit()
+        desc_input.setFont(self.font)
         qty_label = QLabel("Quantity:")
+        qty_label.setFont(self.font)
         qty_input = QLineEdit()
+        qty_input.setFont(self.font)
+        qty_validator = QIntValidator()
+        qty_input.setValidator(qty_validator)
         price_label = QLabel("Price:")
+        price_label.setFont(self.font)
         price_input = QLineEdit()
+        price_input.setFont(self.font)
+        price_validator = QDoubleValidator()
+        price_input.setValidator(price_validator)
         save_button = QPushButton("Save")
+        save_button.setFont(self.font)
         cancel_button = QPushButton("Cancel")
+        cancel_button.setFont(self.font)
 
+        
         # Add widgets to the add item window
         layout = QVBoxLayout()
         layout.addWidget(name_label)
@@ -325,17 +373,33 @@ class InventoryManagementSystem(QWidget):
         edit_item_window.setWindowTitle("Edit Item")
         edit_item_window.setGeometry(100, 100, 400, 300)
 
-        # Create widgets for the edit item window
+        
+        # Create widgets for the add item window
         name_label = QLabel("Item Name:")
+        name_label.setFont(self.font)
         name_input = QLineEdit(name)
+        name_input.setFont(self.font)
         desc_label = QLabel("Description:")
+        desc_label.setFont(self.font)
         desc_input = QLineEdit(desc)
+        desc_input.setFont(self.font)
         qty_label = QLabel("Quantity:")
+        qty_label.setFont(self.font)
         qty_input = QLineEdit(str(qty))
+        qty_input.setFont(self.font)
+        qty_validator = QIntValidator()
+        qty_input.setValidator(qty_validator)
         price_label = QLabel("Price:")
+        price_label.setFont(self.font)
         price_input = QLineEdit(str(price))
+        price_input.setFont(self.font)
+        price_validator = QDoubleValidator()
+        price_input.setValidator(price_validator)
         save_button = QPushButton("Save")
+        save_button.setFont(self.font)
         cancel_button = QPushButton("Cancel")
+        cancel_button.setFont(self.font)
+
 
         # Add widgets to the edit item window
         layout = QVBoxLayout()
