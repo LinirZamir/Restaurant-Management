@@ -1,6 +1,6 @@
 import sys
 import pandas as pd
-from PyQt5.QtWidgets import QDialogButtonBox,  QTabWidget, QSystemTrayIcon, QDialog, QApplication, QSpinBox, QMenuBar, QMenu, QAction, QMessageBox, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QDialogButtonBox, QListWidget, QPushButton, QTabWidget, QSystemTrayIcon, QDialog, QApplication, QSpinBox, QMenuBar, QMenu, QAction, QMessageBox, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
 from PyQt5.QtGui import QFont, QIcon, QIntValidator, QDoubleValidator
 from PyQt5.QtCore import Qt, QTimer, QSettings
 import sqlite3
@@ -53,10 +53,25 @@ class InventoryManagementSystem(QWidget):
         self.reports_tab = QWidget()
 
         # Add tabs to the tab widget
-        self.tabs.addTab(self.orders_tab, "Orders")
         self.tabs.addTab(self.inventory_tab, "Inventory")
+        self.tabs.addTab(self.orders_tab, "Orders")
         self.tabs.addTab(self.suppliers_tab, "Suppliers")
         self.tabs.addTab(self.reports_tab, "Reports")
+        self.tabs.tabBar().setFont(self.font)
+
+        ## TABS: REPORT
+        self.reports_layout = QVBoxLayout()
+        
+        self.reports_list = QListWidget()
+        self.reports_list.addItem("Stock Used Report")
+        self.reports_list.setFont(self.font)
+        self.generate_report_button = QPushButton("Generate Report")
+        self.generate_report_button.setFont(self.font)
+        self.generate_report_button.clicked.connect(self.generate_report)
+
+        self.reports_layout.addWidget(self.reports_list)
+        self.reports_layout.addWidget(self.generate_report_button)
+        self.reports_tab.setLayout(self.reports_layout)
 
         # Create navigation bar
         self.nav_bar = QHBoxLayout()
@@ -145,10 +160,6 @@ class InventoryManagementSystem(QWidget):
         min_qty_action.triggered.connect(self.set_min_qty_threshold)
         settings_menu.addAction(min_qty_action)
 
-        # Add a stock use action to the settings menu
-        sales_report_action = QAction("Stock Used", self)
-        sales_report_action.triggered.connect(self.generate_sales_report)
-        settings_menu.addAction(sales_report_action)
         # Add a help menu to the menu bar
         help_menu = QMenu("Help", self)
         menu_bar.addMenu(help_menu)
@@ -174,6 +185,11 @@ class InventoryManagementSystem(QWidget):
         # Set the menu bar to the main layout
         main_layout.setMenuBar(menu_bar)
 
+    def generate_report(self):
+        current_item = self.reports_list.currentItem()
+        if current_item.text() == "Stock Used Report":
+            self.generate_sales_report()
+            
     def sort_table(self, column):
         self.item_list.sortItems(column, self.sort_order)
         if self.sort_order == Qt.AscendingOrder:
